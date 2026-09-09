@@ -281,28 +281,30 @@ def ai_hub_features(data: AIHubRequest):
         "Content-Type": "application/json"
     }
     
-    # 🌟 মডেল পরিবর্তন: Mistral এর বদলে Llama-3 ব্যবহার করা হলো (এটি বেশি স্টেবল) 🌟
-    payload = {
-        "model": "meta-llama/llama-3-8b-instruct:free", 
-        "messages": [{"role": "user", "content": prompt}]
-    }
+    # 🌟 মাল্টি-মডেল ফলব্যাক সিস্টেম 🌟
+    # যদি ১ম মডেল কাজ না করে, সার্ভার অটোমেটিক ২য় বা ৩য় মডেলে ট্রাই করবে
+    free_models = [
+        "google/gemma-2-9b-it:free",         # 1st Choice: Google's Powerful Gemma 2
+        "huggingfaceh4/zephyr-7b-beta:free", # 2nd Choice: Zephyr Fallback
+        "mistralai/mistral-7b-instruct:free" # 3rd Choice: Mistral Fallback
+    ]
     
-    try:
-        # টাইমআউট বাড়িয়ে 20 সেকেন্ড করা হলো
-        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
-        
-        # যদি API থেকে কোনো এরর আসে (যেমন 401, 429), এটি এক্সেপশন থ্রো করবে
-        res.raise_for_status() 
-        
-        ai_response = res.json()['choices'][0]['message']['content']
-        return {"success": True, "data": ai_response}
-        
-    except requests.exceptions.HTTPError as err:
-        # 🌟 ফিক্স: OpenRouter ঠিক যে কারণে ব্লক করছে, সেই আসল মেসেজটি ফ্লাটারে পাঠাবে 🌟
-        error_details = res.text
-        print(f"OpenRouter HTTP Error: {error_details}")
-        return {"success": False, "error": f"API Error: {res.status_code} - {error_details}"}
-        
-    except Exception as e:
-        print(f"Internal Server Error: {str(e)}")
-        return {"success": False, "error": f"Server Error: {str(e)}"}
+    last_error = ""
+    for model in free_models:
+        payload = {
+            "model": model, 
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        try:
+            res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
+            res.raise_for_status() 
+            ai_response = res.json()['choices'][0]['message']['content']
+            return {"success": True, "data": ai_response}
+        except Exception as e:
+            # এরর হলে প্রিন্ট করে লুপ চালিয়ে পরের মডেলে চলে যাবে
+            last_error = str(res.text) if 'res' in locals() and hasattr(res, 'text') else str(e)
+            print(f"Failed with {model}. Moving to fallback. Error: {last_error}")
+            continue 
+            
+    # যদি ৩টা মডেলই ফেইল করে তখন এই মেসেজ যাবে
+    return {"success": False, "error": "All AI models are currently busy. Please try again later."}
