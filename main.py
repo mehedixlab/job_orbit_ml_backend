@@ -255,7 +255,6 @@ def calculate_match(data: MatchRequest):
 # --- 6. AI Hub Features (Google Gemini API Integration) ---
 @app.post("/ai-hub")
 def ai_hub_features(data: AIHubRequest):
-    # Render এর Environment Variable থেকে Gemini API Key নেওয়া হচ্ছে
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     
     if not GEMINI_API_KEY:
@@ -275,14 +274,13 @@ def ai_hub_features(data: AIHubRequest):
         prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
-    # Gemini 1.5 Flash REST API Endpoint
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # 🌟 ফিক্স: মডেলের নামের শেষে '-latest' যুক্ত করা হয়েছে 🌟
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
     
     headers = {
         "Content-Type": "application/json"
     }
     
-    # Gemini API এর পে-লোড স্ট্রাকচার
     payload = {
         "contents": [{
             "parts": [{"text": prompt}]
@@ -295,8 +293,6 @@ def ai_hub_features(data: AIHubRequest):
         res.raise_for_status() 
         
         response_data = res.json()
-        
-        # Gemini এর রেসপন্স থেকে আসল টেক্সট এক্সট্র্যাক্ট করা
         ai_response = response_data['candidates'][0]['content']['parts'][0]['text']
         
         return {"success": True, "data": ai_response}
