@@ -14,6 +14,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
+# --- Request Models ---
 class MatchRequest(BaseModel):
     student_skills: Optional[str] = "" 
     job_requirements: str
@@ -22,6 +23,13 @@ class MatchRequest(BaseModel):
 
 class ExtractRequest(BaseModel):
     cv_url: str
+
+class AIHubRequest(BaseModel):
+    action: str
+    skills: str
+    target_job: Optional[str] = ""
+    answer: Optional[str] = ""
+    query: Optional[str] = ""
 
 # 🌟 1. FIX: User-Agent যুক্ত করে PDF Text Extraction 🌟
 def extract_text_from_pdf_url(pdf_url):
@@ -122,6 +130,9 @@ def classify_skills(job_req_string):
             required_skills.append(skill)
     return required_skills, preferred_skills
 
+
+# --- API ENDPOINTS ---
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to JobOrbitBD Advanced AI Matching API 🚀"}
@@ -174,7 +185,7 @@ def calculate_match(data: MatchRequest):
             if target_lower in s.lower() or s.lower() in target_lower:
                 return True
 
-        # 5.2 Smart Alias Group Match (HTTP API = REST API = API Development)
+        # 5.2 Smart Alias Group Match
         alias_groups = [
             ["rest", "http", "api"],
             ["machine learning", "ml", "deep learning"],
@@ -184,9 +195,7 @@ def calculate_match(data: MatchRequest):
         ]
         
         for group in alias_groups:
-            # যদি জবের রিকোয়ারমেন্টে এই গ্রুপের কোনো শব্দ থাকে (যেমন: HTTP)
             if any(alias in target_lower for alias in group):
-                # এবং সিভিতে যদি এই গ্রুপের অন্য কোনো শব্দ থাকে (যেমন: REST)
                 if any(alias in cv_lower for alias in group):
                     return True
                 for s in student_skills_list:
@@ -204,7 +213,7 @@ def calculate_match(data: MatchRequest):
                 if response.status_code == 200:
                     scores = response.json()
                     if isinstance(scores, list) and len(scores) > 0:
-                        if max(scores) > 0.35: # থ্রেশহোল্ড ফিক্স
+                        if max(scores) > 0.35: 
                             return True
             except Exception as e:
                 print(f"HF Error: {e}")
@@ -242,3 +251,46 @@ def calculate_match(data: MatchRequest):
         "missing_skills": missing_required,
         "message": breakdown_msg
     }
+
+# --- 6. AI Hub Features (OpenRouter API Integration) ---
+@app.post("/ai-hub")
+def ai_hub_features(data: AIHubRequest):
+    # গিটহাবে যেন API Key লিক না হয়, তাই Environment Variable থেকে নেওয়া হচ্ছে
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    
+    if not OPENROUTER_API_KEY:
+        return {"success": False, "error": "OpenRouter API Key is missing on the server!"}
+    
+    prompt = ""
+    if data.action == "generate_questions":
+        prompt = (f"You are an expert technical recruiter. The candidate is applying for the '{data.target_job}' role "
+                  f"and has the following skills: {data.skills}. Generate exactly 5 technical and 3 behavioral interview "
+                  f"questions to test their expertise. Provide only the questions in a clean, numbered format without answers.")
+    
+    elif data.action == "mock_eval":
+        prompt = (f"You are an expert technical interviewer. Evaluate this interview answer provided by a candidate: "
+                  f"'{data.answer}'. Provide a score out of 10 and a brief 2-3 sentence constructive feedback on how they can improve.")
+                  
+    elif data.action == "career_chat":
+        prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
+                  f"Answer their career-related query directly and professionally: '{data.query}'")
+        
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://joborbitbd.com", 
+        "X-Title": "JobOrbitBD"
+    }
+    
+    payload = {
+        "model": "mistralai/mistral-7b-instruct:free", 
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    try:
+        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+        res.raise_for_status()
+        ai_response = res.json()['choices'][0]['message']['content']
+        return {"success": True, "data": ai_response}
+    except Exception as e:
+        print(f"OpenRouter API Error: {e}")
+        return {"success": False, "error": "AI Server is currently busy. Please try again."}
