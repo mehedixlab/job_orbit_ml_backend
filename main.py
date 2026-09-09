@@ -252,13 +252,14 @@ def calculate_match(data: MatchRequest):
         "message": breakdown_msg
     }
 
-# --- 6. AI Hub Features (OpenRouter API Integration) ---
+# --- 6. AI Hub Features (Google Gemini API Integration) ---
 @app.post("/ai-hub")
 def ai_hub_features(data: AIHubRequest):
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    # Render এর Environment Variable থেকে Gemini API Key নেওয়া হচ্ছে
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     
-    if not OPENROUTER_API_KEY:
-        return {"success": False, "error": "Render Server Error: OPENROUTER_API_KEY is not set in Environment Variables!"}
+    if not GEMINI_API_KEY:
+        return {"success": False, "error": "Render Server Error: GEMINI_API_KEY is not set in Environment Variables!"}
     
     prompt = ""
     if data.action == "generate_questions":
@@ -274,37 +275,37 @@ def ai_hub_features(data: AIHubRequest):
         prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
+    # Gemini 1.5 Flash REST API Endpoint
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://joborbitbd.com", 
-        "X-Title": "JobOrbitBD",
         "Content-Type": "application/json"
     }
     
-    # 🌟 মাল্টি-মডেল ফলব্যাক সিস্টেম 🌟
-    # যদি ১ম মডেল কাজ না করে, সার্ভার অটোমেটিক ২য় বা ৩য় মডেলে ট্রাই করবে
-    free_models = [
-        "google/gemma-2-9b-it:free",         # 1st Choice: Google's Powerful Gemma 2
-        "huggingfaceh4/zephyr-7b-beta:free", # 2nd Choice: Zephyr Fallback
-        "mistralai/mistral-7b-instruct:free" # 3rd Choice: Mistral Fallback
-    ]
+    # Gemini API এর পে-লোড স্ট্রাকচার
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
-    last_error = ""
-    for model in free_models:
-        payload = {
-            "model": model, 
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        try:
-            res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
-            res.raise_for_status() 
-            ai_response = res.json()['choices'][0]['message']['content']
-            return {"success": True, "data": ai_response}
-        except Exception as e:
-            # এরর হলে প্রিন্ট করে লুপ চালিয়ে পরের মডেলে চলে যাবে
-            last_error = str(res.text) if 'res' in locals() and hasattr(res, 'text') else str(e)
-            print(f"Failed with {model}. Moving to fallback. Error: {last_error}")
-            continue 
-            
-    # যদি ৩টা মডেলই ফেইল করে তখন এই মেসেজ যাবে
-    return {"success": False, "error": "All AI models are currently busy. Please try again later."}
+    try:
+        # টাইমআউট ২০ সেকেন্ড রাখা হলো
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        res.raise_for_status() 
+        
+        response_data = res.json()
+        
+        # Gemini এর রেসপন্স থেকে আসল টেক্সট এক্সট্র্যাক্ট করা
+        ai_response = response_data['candidates'][0]['content']['parts'][0]['text']
+        
+        return {"success": True, "data": ai_response}
+        
+    except requests.exceptions.HTTPError as err:
+        error_details = res.text
+        print(f"Gemini HTTP Error: {error_details}")
+        return {"success": False, "error": f"API Error: {res.status_code} - {error_details}"}
+        
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return {"success": False, "error": f"Server Error: {str(e)}"}
