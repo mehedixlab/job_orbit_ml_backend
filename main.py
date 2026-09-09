@@ -283,9 +283,16 @@ def ai_hub_features(data: AIHubRequest):
         "Content-Type": "application/json"
     }
     
-    # 🌟 ফিক্স: Groq এর লেটেস্ট এবং ফাস্ট 'llama-3.1-8b-instant' মডেল ব্যবহার করা হলো 🌟
+    # 🌟 চূড়ান্ত ফিক্স: Groq-এর সবচেয়ে স্টেবল এবং ইউনিভার্সাল মডেল (Mixtral) 🌟
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
     payload = {
-        "model": "llama-3.1-8b-instant", 
+        "model": "mixtral-8x7b-32768", 
         "messages": [{"role": "user", "content": prompt}]
     }
     
