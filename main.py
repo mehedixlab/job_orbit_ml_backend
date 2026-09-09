@@ -255,10 +255,13 @@ def calculate_match(data: MatchRequest):
 # --- 6. AI Hub Features (Google Gemini API Integration) ---
 @app.post("/ai-hub")
 def ai_hub_features(data: AIHubRequest):
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    raw_key = os.getenv("GEMINI_API_KEY")
     
-    if not GEMINI_API_KEY:
+    if not raw_key:
         return {"success": False, "error": "Render Server Error: GEMINI_API_KEY is not set in Environment Variables!"}
+        
+    # .strip() যুক্ত করা হলো যাতে API Key এর আগে-পিছে কোনো স্পেস থাকলে তা মুছে যায়
+    GEMINI_API_KEY = raw_key.strip()
     
     prompt = ""
     if data.action == "generate_questions":
@@ -274,8 +277,8 @@ def ai_hub_features(data: AIHubRequest):
         prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
-    # 🌟 ফিক্স: মডেলের নামের শেষে '-latest' যুক্ত করা হয়েছে 🌟
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # 🌟 ফিক্স: সবচেয়ে স্টেবল 'gemini-pro' মডেল এবং v1beta ব্যবহার করা হলো 🌟
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     
     headers = {
         "Content-Type": "application/json"
