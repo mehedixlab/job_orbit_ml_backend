@@ -255,11 +255,10 @@ def calculate_match(data: MatchRequest):
 # --- 6. AI Hub Features (OpenRouter API Integration) ---
 @app.post("/ai-hub")
 def ai_hub_features(data: AIHubRequest):
-    # গিটহাবে যেন API Key লিক না হয়, তাই Environment Variable থেকে নেওয়া হচ্ছে
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
     if not OPENROUTER_API_KEY:
-        return {"success": False, "error": "OpenRouter API Key is missing on the server!"}
+        return {"success": False, "error": "Render Server Error: OPENROUTER_API_KEY is not set in Environment Variables!"}
     
     prompt = ""
     if data.action == "generate_questions":
@@ -278,19 +277,32 @@ def ai_hub_features(data: AIHubRequest):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "HTTP-Referer": "https://joborbitbd.com", 
-        "X-Title": "JobOrbitBD"
+        "X-Title": "JobOrbitBD",
+        "Content-Type": "application/json"
     }
     
+    # 🌟 মডেল পরিবর্তন: Mistral এর বদলে Llama-3 ব্যবহার করা হলো (এটি বেশি স্টেবল) 🌟
     payload = {
-        "model": "mistralai/mistral-7b-instruct:free", 
+        "model": "meta-llama/llama-3-8b-instruct:free", 
         "messages": [{"role": "user", "content": prompt}]
     }
     
     try:
-        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-        res.raise_for_status()
+        # টাইমআউট বাড়িয়ে 20 সেকেন্ড করা হলো
+        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        
+        # যদি API থেকে কোনো এরর আসে (যেমন 401, 429), এটি এক্সেপশন থ্রো করবে
+        res.raise_for_status() 
+        
         ai_response = res.json()['choices'][0]['message']['content']
         return {"success": True, "data": ai_response}
+        
+    except requests.exceptions.HTTPError as err:
+        # 🌟 ফিক্স: OpenRouter ঠিক যে কারণে ব্লক করছে, সেই আসল মেসেজটি ফ্লাটারে পাঠাবে 🌟
+        error_details = res.text
+        print(f"OpenRouter HTTP Error: {error_details}")
+        return {"success": False, "error": f"API Error: {res.status_code} - {error_details}"}
+        
     except Exception as e:
-        print(f"OpenRouter API Error: {e}")
-        return {"success": False, "error": "AI Server is currently busy. Please try again."}
+        print(f"Internal Server Error: {str(e)}")
+        return {"success": False, "error": f"Server Error: {str(e)}"}
