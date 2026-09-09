@@ -276,7 +276,6 @@ def ai_hub_features(data: AIHubRequest):
         prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
-    # 🌟 ফিক্স: বিশ্বের সবচেয়ে ফাস্ট Groq API এবং Llama-3 মডেল 🌟
     url = "https://api.groq.com/openai/v1/chat/completions"
     
     headers = {
@@ -284,13 +283,13 @@ def ai_hub_features(data: AIHubRequest):
         "Content-Type": "application/json"
     }
     
+    # 🌟 ফিক্স: Groq এর লেটেস্ট এবং ফাস্ট 'llama-3.1-8b-instant' মডেল ব্যবহার করা হলো 🌟
     payload = {
-        "model": "llama3-8b-8192", 
+        "model": "llama-3.1-8b-instant", 
         "messages": [{"role": "user", "content": prompt}]
     }
     
     try:
-        # টাইমআউট ২০ সেকেন্ড রাখা হলো
         res = requests.post(url, headers=headers, json=payload, timeout=20)
         res.raise_for_status() 
         
