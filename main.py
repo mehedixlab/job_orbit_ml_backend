@@ -292,7 +292,7 @@ def ai_hub_features(data: AIHubRequest):
     }
     
     payload = {
-        "model": "mixtral-8x7b-32768", 
+        "model": "openai/gpt-oss-20b", 
         "messages": [{"role": "user", "content": prompt}]
     }
     
