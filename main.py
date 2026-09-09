@@ -275,7 +275,7 @@ def ai_hub_features(data: AIHubRequest):
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
     # 🌟 ফিক্স: মডেলের নামের শেষে '-latest' যুক্ত করা হয়েছে 🌟
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     headers = {
         "Content-Type": "application/json"
