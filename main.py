@@ -252,16 +252,15 @@ def calculate_match(data: MatchRequest):
         "message": breakdown_msg
     }
 
-# --- 6. AI Hub Features (Google Gemini API Integration) ---
+# --- 6. AI Hub Features (Groq API Integration) ---
 @app.post("/ai-hub")
 def ai_hub_features(data: AIHubRequest):
-    raw_key = os.getenv("GEMINI_API_KEY")
+    raw_key = os.getenv("GROQ_API_KEY")
     
     if not raw_key:
-        return {"success": False, "error": "Render Server Error: GEMINI_API_KEY is not set in Environment Variables!"}
+        return {"success": False, "error": "Render Server Error: GROQ_API_KEY is not set in Environment Variables!"}
         
-    # .strip() যুক্ত করা হলো যাতে API Key এর আগে-পিছে কোনো স্পেস থাকলে তা মুছে যায়
-    GEMINI_API_KEY = raw_key.strip()
+    GROQ_API_KEY = raw_key.strip()
     
     prompt = ""
     if data.action == "generate_questions":
@@ -277,17 +276,17 @@ def ai_hub_features(data: AIHubRequest):
         prompt = (f"You are an expert career counselor. The user is a student with skills in {data.skills}. "
                   f"Answer their career-related query directly and professionally: '{data.query}'")
         
-    # 🌟 ফিক্স: সবচেয়ে স্টেবল 'gemini-pro' মডেল এবং v1beta ব্যবহার করা হলো 🌟
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    # 🌟 ফিক্স: বিশ্বের সবচেয়ে ফাস্ট Groq API এবং Llama-3 মডেল 🌟
+    url = "https://api.groq.com/openai/v1/chat/completions"
     
     headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     
     payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "model": "llama3-8b-8192", 
+        "messages": [{"role": "user", "content": prompt}]
     }
     
     try:
@@ -296,13 +295,13 @@ def ai_hub_features(data: AIHubRequest):
         res.raise_for_status() 
         
         response_data = res.json()
-        ai_response = response_data['candidates'][0]['content']['parts'][0]['text']
+        ai_response = response_data['choices'][0]['message']['content']
         
         return {"success": True, "data": ai_response}
         
     except requests.exceptions.HTTPError as err:
         error_details = res.text
-        print(f"Gemini HTTP Error: {error_details}")
+        print(f"Groq HTTP Error: {error_details}")
         return {"success": False, "error": f"API Error: {res.status_code} - {error_details}"}
         
     except Exception as e:
